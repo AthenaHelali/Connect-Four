@@ -64,8 +64,18 @@ def winning_move(board, piece, col, row):
                 return True
             
 def score_position(board, piece):
-    #score horizontal
+
+    if piece == 1:
+        other_piece = 2
+    else:
+        other_piece = 1
     score = 0
+    #score center column
+    center_array = [int(i) for i in list(board[:,Column_Num//2])] 
+    center_count = center_array.count(piece)
+    score += center_count*6 
+
+    #score horizontal
     for r in range(Row_Num):
         row_array = [int(i) for i in list(board[r,:])]
         for c in range(Column_Num-3):
@@ -74,7 +84,129 @@ def score_position(board, piece):
                 score += 100
             elif window.count(piece) == 3 and window.count(0) == 1:
                 score += 10
-    return score
+            elif window.count(piece)==2 and window.count(0) == 2:
+                score +=5
+            elif window.count(other_piece ) == 3 and window.count(0) ==  1:
+                score -= 5
+
+    #score vertical
+    for c in range(Column_Num):
+        col_array = [int(i) for i in list(board[:,c])]
+        for r in range(Row_Num-3):
+            window = col_array[r:r+4]
+
+            if window.count(piece)==4:
+                score += 100
+            elif window.count(piece) == 3 and window.count(0) == 1:
+                score +=10
+            elif window.count(piece)==2 and window.count(0) == 2:
+                score +=5
+            elif window.count(other_piece ) == 3 and window.count(0) ==  1:
+                score -= 50
+
+    # score positive sloped diagram
+    for r in range(Row_Num-3):
+        for c in range(Column_Num-3):
+            window = [board[r+i][c+i] for i in range(4)]
+            if window.count(piece)==4:
+                score += 100
+            elif window.count(piece) == 3 and window.count(0) == 1:
+                score +=10 
+            elif window.count(piece)==2 and window.count(0) == 2:
+                score +=5
+            elif window.count(other_piece) == 3 and window.count(0) ==  1:
+                score -= 5
+
+    # score positive sloped diagram
+    for r in range(Row_Num-3):
+        for c in range(Column_Num-3):
+            window = [board[r+3-i][c+i] for i in range(4)]
+            if window.count(piece)==4:
+                score += 100
+            elif window.count(piece) == 3 and window.count(0) == 1:
+                score +=10 
+            elif window.count(piece)==2 and window.count(0) == 2:
+                score +=5
+            elif window.count(other_piece ) == 3 and window.count(0) ==  1:
+                score -= 50
+    return score 
+
+def all_winning_moves(board, piece):
+    for c in range(Column_Num-3):
+        for r in range(Row_Num):
+            if board[r][c] == piece and board[r][c+1]==piece and board[r][c+2]==piece and board[r][c+3] == piece:
+                return True
+
+     # check vertical move 
+    for c in range(Column_Num):  
+        for r in range(Row_Num-3):
+            if board[r][c] == piece and board[r+1][c]==piece and board[r+2][c]==piece and board[r+3][c] == piece:
+                return True
+        
+    #check positively sloped diaganols
+    for c in range(Column_Num-3):
+        for r in range(Row_Num-3):
+            if board[r][c]== piece and board[r+1][c+1]== piece and board[r+2][c+2]== piece and board[r+3][c+3]== piece:
+                return True
+
+    #check negatively sloped diaganols
+
+    for c in range(Column_Num-3):
+        for r in range(Row_Num-3):
+            if board[r][c]== piece and board[r-1][c+1]== piece and board[r-2][c+2]== piece and board[r-3][c+3]== piece:
+                return True
+
+
+def is_terminal_node(board):
+    return all_winning_moves(board, PLAYER_PIECE) or all_winning_moves(board,AI_PIECE) or len(get_valid_locations(board)) == 0
+     
+
+def minimax(board, depth, alpha, beta, maximizingPlayer):
+    valid_locations = get_valid_locations(board)
+    is_terminal = is_terminal_node(board)
+
+    if is_terminal:
+        if all_winning_moves(board,AI_PIECE):
+            return None, 1000000
+        elif all_winning_moves(board, PLAYER_PIECE):
+            return None, -1000000
+        else:
+            return None,  0
+    elif depth == 0:
+        return None, score_position(board,AI_PIECE)
+    
+    if maximizingPlayer:
+        value = -math.inf
+        column = random.choice(valid_locations)
+        for col in valid_locations:
+            row = get_next_open_row(board, col)
+            b_copy = board.copy()
+            drop_piece(b_copy, row, col, AI_PIECE)
+            cl, new_score = minimax(b_copy, depth-1, alpha, beta, False)
+            if new_score > value:
+                value = new_score
+                column = col 
+            alpha = max(alpha, value)
+            if alpha >= beta:
+                break
+        return column, value
+    else:
+        value = math.inf
+        column = random.choice(valid_locations)
+        for col in valid_locations:
+            row = get_next_open_row(board, col)
+            b_copy = board.copy()
+            drop_piece(b_copy, row, col, PLAYER_PIECE)
+            cl, new_score = minimax(b_copy, depth-1, alpha, beta, True)
+            if new_score < value:
+                value = new_score
+                column = col 
+            beta = min(beta, value)
+            if alpha >= beta:
+                break
+        return column, value
+
+         
 
 def get_valid_locations(board):
     valid_locations = []
@@ -86,8 +218,19 @@ def get_valid_locations(board):
 
 def pick_best_move(board,piece):
     valid_locations = get_valid_locations(board)
+    best_score = -1000
+    best_col = random.choice(valid_locations)
+    for col in valid_locations:
+        row = get_next_open_row(board, col)
+        temp_board = board.copy()
+        drop_piece(temp_board, row, col, piece)
+        score = score_position(temp_board, piece)
+        if score > best_score:
+            best_score = score
+            best_col = col
+    return best_col
 
-
+ 
 def draw_board(board):
     for c in range(Column_Num):
         for r in range(Row_Num):
@@ -162,10 +305,8 @@ while not game_over:
 
             #Player2 input
         if turn == AI and not game_over:
-            column = random.randint(0, Column_Num-1)
-
+            column, minimax_score  = minimax(board, 6, -math.inf, math.inf, True)
             if is_valid_location(board, column):
-                pygame.time.wait(500)
                 row = get_next_open_row(board, column)
                 drop_piece(board, row, column, AI_PIECE)
 
